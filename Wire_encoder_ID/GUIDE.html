@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="UTF-8">
+<title>Wire Encoder ID Config — Гайд</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0d1117; color: #e6edf3; font-size: 15px; line-height: 1.6; }
+  h1  { text-align: center; padding: 32px 16px 8px; font-size: 26px; color: #58a6ff; }
+  .subtitle { text-align: center; color: #8b949e; padding-bottom: 32px; font-size: 14px; }
+  .step  { background: #161b22; border: 1px solid #30363d; border-radius: 10px; margin: 16px auto; max-width: 860px; overflow: hidden; }
+  .step-header { display: flex; align-items: center; gap: 14px; padding: 14px 20px; background: #21262d; border-bottom: 1px solid #30363d; }
+  .num   { width: 34px; height: 34px; background: #1f6feb; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; flex-shrink: 0; }
+  .step-title { font-size: 17px; font-weight: 600; color: #f0f6fc; }
+  .step-body  { padding: 20px 24px; }
+  pre  { background: #010409; border: 1px solid #21262d; border-radius: 8px; padding: 16px; font-family: 'Courier New', monospace; font-size: 13px; overflow-x: auto; line-height: 1.5; color: #e6edf3; }
+  .diag { background: #010409; border: 1px solid #21262d; border-radius: 8px; padding: 18px 20px; font-family: 'Courier New', monospace; font-size: 13px; color: #e6edf3; overflow-x: auto; }
+  .lbl  { color: #79c0ff; font-weight: bold; }
+  .wire-h { color: #f85149; }
+  .wire-l { color: #3fb950; }
+  .wire-v { color: #ffa657; }
+  .wire-g { color: #8b949e; }
+  .wire-tx { color: #d2a8ff; }
+  .wire-rx { color: #79c0ff; }
+  .green { color: #3fb950; }
+  .red   { color: #f85149; }
+  .yellow { color: #e3b341; }
+  .blue   { color: #58a6ff; }
+  .tag   { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; margin-right: 4px; }
+  .tag-g { background: #1a4a2e; color: #3fb950; }
+  .tag-r { background: #4a1a1a; color: #f85149; }
+  .tag-y { background: #4a3a1a; color: #e3b341; }
+  .tag-b { background: #1a2f4a; color: #58a6ff; }
+  ul, ol { padding-left: 20px; }
+  li { margin: 6px 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .box   { background: #010409; border: 1px solid #21262d; border-radius: 8px; padding: 14px; }
+  .box h4 { color: #79c0ff; margin-bottom: 8px; font-size: 14px; }
+  .note  { background: #1c2d3e; border-left: 3px solid #58a6ff; padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 12px 0; font-size: 13px; color: #cdd9e5; }
+  .warn  { background: #2d1f0e; border-left: 3px solid #ffa657; padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 12px 0; font-size: 13px; color: #ffa657; }
+  .ok    { background: #0e2d18; border-left: 3px solid #3fb950; padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 12px 0; font-size: 13px; color: #3fb950; }
+  .highlight { color: #ffa657; font-weight: bold; }
+  hr.divider { border: none; border-top: 1px solid #21262d; margin: 16px 0; }
+</style>
+</head>
+<body>
+
+<h1>Wire Encoder CAN ID Config Tool</h1>
+<div class="subtitle">STM32 Nucleo-F746ZG · Briter CAN Wire Encoder · Ашиглах гайд</div>
+
+<!-- ─────────────────────────────────────────── STEP 1 ──── -->
+<div class="step">
+  <div class="step-header">
+    <div class="num">1</div>
+    <div class="step-title">Шаардлагатай тоног төхөөрөмж</div>
+  </div>
+  <div class="step-body">
+    <div class="grid2">
+      <div class="box">
+        <h4>Hardware</h4>
+        <ul>
+          <li>STM32 Nucleo-F746ZG</li>
+          <li>Briter CAN Wire Encoder</li>
+          <li>CAN Transceiver: <span class="highlight">MCP2551</span></li>
+          <li>Резистор: 10kΩ × 1, 20kΩ × 1 (RXD хүчдэл хуваагч)</li>
+          <li>12–24V тэжээл (encoder-д)</li>
+          <li>USB кабель (Nucleo)</li>
+          <li>Дамжуулах утас</li>
+        </ul>
+      </div>
+      <div class="box">
+        <h4>Software</h4>
+        <ul>
+          <li>STM32CubeIDE v1.14+</li>
+          <li>Serial terminal (CubeIDE внутри <b>Terminal</b> view эсвэл PuTTY)</li>
+          <li>115200 baud, 8N1</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────── STEP 2 ──── -->
+<div class="step">
+  <div class="step-header">
+    <div class="num">2</div>
+    <div class="step-title">Wiring Diagram — Холболтын схем</div>
+  </div>
+  <div class="step-body">
+
+    <div class="diag">
+<span class="lbl">┌─────────────────────────────────┐         ┌──────────────────────────┐</span>
+<span class="lbl">│   STM32 Nucleo-F746ZG           │         │   MCP2551  (DIP-8)       │</span>
+<span class="lbl">│   (Morpho CN12)                 │         │                          │</span>
+<span class="lbl">│                                 │         │  Pin 1  TXD ◄────────────</span>│<span class="wire-tx">──── PA12 (CAN_TX) CN12-12</span>
+│                                 │   <span class="yellow">10kΩ</span>  │  <span class="wire-rx">Pin 4  RXD ──────┤</span>          │
+│                                 │         │         <span class="wire-rx">        ├──┐</span>       │
+│                                 │         │         <span class="wire-rx">       20kΩ ▼</span>       │
+│  <span class="wire-rx">PA11 (CAN_RX) CN12 pin 10</span>  <span class="wire-rx">◄──────────────────────────┘</span>  <span class="wire-g">GND</span>       │
+│  <span class="wire-v">5V              CN11 pin 18</span>  <span class="wire-v">──────────────────────────</span>│<span class="wire-v"> Pin 3  VDD       </span>│
+│  <span class="wire-g">GND             CN12 pin  7</span>  <span class="wire-g">──────────────────────────</span>│<span class="wire-g"> Pin 2  VSS       </span>│
+<span class="lbl">│                                 │         │                          │</span>
+<span class="lbl">└─────────────────────────────────┘         │  Pin 8  Rs ──── GND      │</span>
+                                             │  Pin 5  Vref (холбохгүй) │
+                                             │                          │
+                                             │  <span class="wire-h">Pin 7  CANH ──────────</span>│<span class="wire-h">──┐</span>
+                                             │  <span class="wire-l">Pin 6  CANL ──────────</span>│<span class="wire-l">──┤</span>
+                                             <span class="lbl">└──────────────────────────┘  │</span>
+                                                                           <span class="lbl">│  120Ω терминал</span>
+                                             <span class="lbl">┌──────────────────────────┐  │</span>
+                                             <span class="lbl">│   Briter Wire Encoder    │  │</span>
+                                             │  <span class="wire-h">CAN_H (Цагаан/Шар)  ──┘</span>  │
+                                             │  <span class="wire-l">CAN_L (Цэнхэр/Ногоон) ────</span>│
+                                             │  <span class="wire-v">VCC  (Улаан)   12–24V   </span>  │
+                                             │  <span class="wire-g">GND  (Хар)              </span>  │
+                                             <span class="lbl">└──────────────────────────┘</span>
+    </div>
+
+    <hr class="divider">
+
+    <div class="diag">
+<span class="lbl">MCP2551 DIP-8 зүү байршил:</span>
+
+        ┌────────────┐
+  TXD  ─┤1  ●     8 ├─ Rs  ──── <span class="wire-g">GND</span>   (1Mbps хурд)
+  VSS  ─┤2          7 ├─ CANH ──── <span class="wire-h">Encoder CAN_H</span>
+  VDD  ─┤3          6 ├─ CANL ──── <span class="wire-l">Encoder CAN_L</span>
+  RXD  ─┤4          5 ├─ Vref (холбохгүй)
+        └────────────┘
+    </div>
+
+    <hr class="divider">
+
+    <div class="diag">
+<span class="lbl">RXD хүчдэл хуваагч (5V → 3.3V):</span>
+
+  MCP2551 RXD (pin 4) ──┬── <span class="yellow">10kΩ</span> ──── PA11 (CN12 pin 10)
+                        │
+                       <span class="yellow">20kΩ</span>
+                        │
+                       GND
+
+  5V × 20/(10+20) = <span class="green">3.33V</span>  ✓  STM32 PA11-д аюулгүй
+    </div>
+
+    <hr class="divider">
+
+    <div class="diag">
+<span class="lbl">Nucleo-F746ZG холбох цэгүүд:</span>
+
+  <span class="lbl">CN12 (зүүн Morpho)</span>         <span class="lbl">CN11 (баруун Morpho)</span>
+   ┌──┐                          ┌──┐
+   │<span class="wire-g">●</span> │  Pin  7  → <span class="wire-g">GND → MCP2551 VSS (pin 2)</span>
+   │<span class="wire-rx">●</span> │  Pin 10  → <span class="wire-rx">PA11 (CAN_RX) ← хуваагчийн гаралт</span>
+   │<span class="wire-tx">●</span> │  Pin 12  → <span class="wire-tx">PA12 (CAN_TX) → MCP2551 TXD (pin 1)</span>
+   └──┘
+                                 │<span class="wire-v">●</span> │  Pin 18  → <span class="wire-v">+5V → MCP2551 VDD (pin 3)</span>
+                                 └──┘
+    </div>
+
+    <div class="warn">MCP2551 RXD (pin 4) гаралт нь <b>5V</b> байдаг — хуваагч резисторгүй шууд STM32-д холбовол GPIO гэмтэж болно.</div>
+    <div class="warn">Rs (pin 8) заавал <b>GND-д</b> холб. Холбоогүй үлдвэл standby горим — CAN дамжуулахгүй.</div>
+    <div class="note">CAN bus-ийн хоёр үзүүрт <b>120Ω</b> терминал резистор хэрэгтэй. Encoder талд ихэвчлэн суурилуулсан байдаг — datasheet шалга.</div>
+
+    <hr class="divider">
+
+    <div class="diag">
+<span class="lbl">Briter Wire Encoder (BRT38 Series) — утасны өнгө:</span>
+
+        <span class="lbl">╔══════════════════╗</span>
+        <span class="lbl">║  ┌────────────┐  ║</span>   ← Encoder body (дөрвөлжин)
+        <span class="lbl">║  │  ⊙ BRITER  │  ║</span>
+        <span class="lbl">║  │  BRT38-C0M │  ║</span>
+        <span class="lbl">║  └────────────┘  ║</span>
+        <span class="lbl">╚════════╤═════════╝</span>
+                 <span class="lbl">│</span>
+            <span class="lbl">┌────┴────┐</span>
+            <span class="lbl">│ [⚡warn] │</span>   ← Тохируулгын наалт
+            <span class="lbl">│         │</span>
+            <span class="lbl">└──┬──────┘</span>
+               <span class="lbl">│</span>  ← Талын залгуур (RT1 — side outlet)
+         <span class="lbl">───[●]───</span>
+               <span class="lbl">│</span>
+    <span style="color:#f85149">───────────┤</span>  <span style="color:#f85149">●</span> <b style="color:#f85149">Улаан (Red)</b>    → <b>VCC  DC 5~24V</b>
+    <span style="color:#8b949e">───────────┤</span>  <span style="color:#8b949e">●</span> <b style="color:#8b949e">Хар   (Black)</b>  → <b>GND</b>
+    <span style="color:#3fb950">───────────┤</span>  <span style="color:#3fb950">●</span> <b style="color:#3fb950">Ногоон (Green)</b> → <b>CAN_H</b>
+    <span style="color:#e6edf3">───────────┤</span>  <span style="color:#e6edf3">●</span> <b style="color:#e6edf3">Цагаан (White)</b> → <b>CAN_L</b>
+    <span style="color:#e3b341">───────────┤</span>  <span style="color:#e3b341">●</span> <b style="color:#e3b341">Шар   (Yellow)</b> → <b>⚠ Функц утас — ажиллах үед ХОЛБОХГҮЙ</b>
+    </div>
+
+    <hr class="divider">
+
+    <div class="diag">
+<span class="lbl">Бүрэн холболтын схем (encoder → MCP2551 → Nucleo):</span>
+
+  <span class="lbl">Encoder</span>           <span class="lbl">Тэжээл</span>              <span class="lbl">MCP2551</span>          <span class="lbl">Nucleo-F746ZG</span>
+  ─────────         ──────────           ────────────      ─────────────────
+  <span style="color:#f85149">● Улаан</span>  ──────────────────── 12~24V (гадаад)
+  <span style="color:#8b949e">● Хар</span>    ──────────┬─────────── GND ─────── VSS pin2 ──── CN12 pin7 GND
+                    │
+  <span style="color:#3fb950">● Ногоон</span> ──────────┼─────────── CANH pin7
+  <span style="color:#e6edf3">● Цагаан</span> ──────────┼─────────── CANL pin6
+                    │
+                    │           <span class="wire-v">+5V (CN11-18)</span> ── VDD  pin3
+                    │                            TXD  pin1 ── PA12 (CN12-12)
+                    │            <span class="yellow">10kΩ</span>             RXD  pin4 ──┬── PA11 (CN12-10)
+                    │                                        <span class="yellow">20kΩ</span>
+                    └─────────────────────────────────────── GND
+                                                 Rs   pin8 ── GND
+  <span style="color:#e3b341">● Шар</span>    ── ⚠ ХОЛБОХГҮЙ (хөвөгч үлдэх)
+    </div>
+
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────── STEP 3 ──── -->
+<div class="step">
+  <div class="step-header">
+    <div class="num">3</div>
+    <div class="step-title">main.c — Тохиргооны утгуудыг өөрчлөх</div>
+  </div>
+  <div class="step-body">
+
+    <div class="note">Зөвхөн доорх 4 тодорхойлолтыг өөрчил. Бусад кодыг хүр<b>эхгүй</b>.</div>
+
+    <pre><span style="color:#8b949e">/* Core/Src/main.c — ~35-р мөр */</span>
+
+<span style="color:#ff7b72">#define</span> <span class="highlight">ENCODER_CURRENT_ID</span>        0x<span class="yellow">01</span>U   <span style="color:#8b949e">← Encoder-ийн ОДООГИЙН CAN ID</span>
+<span style="color:#ff7b72">#define</span> <span class="highlight">ENCODER_TARGET_ID</span>         0x<span class="yellow">02</span>U   <span style="color:#8b949e">← Encoder-ийг СОЛИХ CAN ID</span>
+
+<span style="color:#ff7b72">#define</span> <span class="highlight">ENCODER_CURRENT_BAUD_CODE</span> <span class="yellow">WENC_BAUD_1M</span>  <span style="color:#8b949e">← Одоогийн baud</span>
+<span style="color:#ff7b72">#define</span> <span class="highlight">ENCODER_TARGET_BAUD_CODE</span>  <span class="yellow">WENC_BAUD_1M</span>  <span style="color:#8b949e">← Солих baud</span></pre>
+
+    <hr class="divider">
+
+    <div class="grid2">
+      <div class="box">
+        <h4>Baud код утгууд</h4>
+        <pre>WENC_BAUD_500K   → 500 kbps
+WENC_BAUD_1M     → 1 Mbps
+WENC_BAUD_250K   → 250 kbps
+WENC_BAUD_125K   → 125 kbps
+WENC_BAUD_100K   → 100 kbps</pre>
+      </div>
+      <div class="box">
+        <h4>Жишээ: ID 1 → 3, baud хэвээр</h4>
+        <pre>ENCODER_CURRENT_ID        0x01U
+ENCODER_TARGET_ID         0x03U
+ENCODER_CURRENT_BAUD_CODE WENC_BAUD_1M
+ENCODER_TARGET_BAUD_CODE  WENC_BAUD_1M</pre>
+      </div>
+    </div>
+
+    <div class="warn">ID болон Baud-ийг нэг дор хоёуланг солих <b>боломжтой</b> — эхлээд ID солино, дараа нь Baud солино.</div>
+
+    <div class="ok">
+      Хэрэв ID эсвэл Baud <b>өөрчлөлт хэрэггүй</b> бол CURRENT == TARGET гэж тавь.<br>
+      Код өөрөө алхамыг алгасана.
+    </div>
+
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────── STEP 4 ──── -->
+<div class="step">
+  <div class="step-header">
+    <div class="num">4</div>
+    <div class="step-title">STM32CubeIDE — Нээх &amp; Build хийх</div>
+  </div>
+  <div class="step-body">
+
+    <ol>
+      <li>
+        <b>CubeIDE нээ</b> → <code>File → Open Projects from File System...</code>
+        <div class="diag" style="margin-top:8px">
+  ┌─────────────────────────────────────────────┐
+  │  File  Edit  Source  Refactor  Navigate …   │
+  │  ┌──────────────────────────────────────┐   │
+  │  │ New                              ▶   │   │
+  │  │ Open Projects from File System…  ←── │◄──┼── ЭНД дар
+  │  │ Import…                              │   │
+  │  └──────────────────────────────────────┘   │
+  └─────────────────────────────────────────────┘
+        </div>
+      </li>
+      <li style="margin-top:12px">
+        <b>Хавтас сонго:</b>
+        <pre>  .../forklift 2/FORKLIFT/Wire_encoder_ID</pre>
+        <code>Finish</code> дар
+      </li>
+      <li style="margin-top:12px">
+        <b>main.c нээ</b> → <code>Core/Src/main.c</code> → 4 тодорхойлолтыг өөрчил (Алхам 3)
+      </li>
+      <li style="margin-top:12px">
+        <b>Build:</b>
+        <div class="diag" style="margin-top:8px">
+  Project Explorer-д Wire_encoder_ID → <b>правый клик</b>
+  ┌─────────────────────────────┐
+  │  Build Project         ←───┼── ЭНД дар  (эсвэл Ctrl+B)
+  │  Clean Project              │
+  └─────────────────────────────┘
+        </div>
+        <div class="note">Console-д <span class="green">"Build Finished"</span> гарвал амжилттай.</div>
+      </li>
+    </ol>
+
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────── STEP 5 ──── -->
+<div class="step">
+  <div class="step-header">
+    <div class="num">5</div>
+    <div class="step-title">Flash (Upload) хийх</div>
+  </div>
+  <div class="step-body">
+
+    <ol>
+      <li>Nucleo-г USB-ээр компьютерт холб</li>
+      <li>
+        <div class="diag">
+  Toolbar дахь <b>Run</b> товч:
+  ┌────────────────────────────────────────────────────────┐
+  │  ▶ Run  ▼                                              │
+  │  ┌────────────────────────────────────────────────┐   │
+  │  │ 1 Wire_encoder_ID Debug (OpenOCD)          ←───┼───┼── ЭНД дар
+  │  └────────────────────────────────────────────────┘   │
+  └────────────────────────────────────────────────────────┘
+        </div>
+      </li>
+      <li>Эсвэл: <code>Run → Run (F11)</code></li>
+    </ol>
+
+    <div class="note">Flash дуусмагц хавтан автоматаар reset хийж программ эхэлнэ.</div>
+
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────── STEP 6 ──── -->
+<div class="step">
+  <div class="step-header">
+    <div class="num">6</div>
+    <div class="step-title">Serial Log — Явцыг хянах</div>
+  </div>
+  <div class="step-body">
+
+    <ol>
+      <li>
+        CubeIDE дотор: <code>Window → Show View → Terminal</code>
+        <div class="diag" style="margin-top:8px">
+  ┌────────────────────────────────────────────────────────┐
+  │ Terminal                                               │
+  │ ┌──────────────────────────────────────────────────┐  │
+  │ │ + (Settings icon) → Local Terminal               │  │
+  │ │ Port: /dev/ttyACM0  (Linux) эсвэл COM3 (Windows) │  │
+  │ │ Baud: 115200   8N1   Flow: None                   │  │
+  │ └──────────────────────────────────────────────────┘  │
+  └────────────────────────────────────────────────────────┘
+        </div>
+      </li>
+      <li>Reset товч дар (Nucleo дахь <b>хар товч</b> — NRST)</li>
+    </ol>
+
+    <div class="grid2" style="margin-top:12px">
+      <div class="box">
+        <h4 class="green">Амжилттай — ногоон LED (LD1)</h4>
+        <pre><span class="green">CONFIG TOOL BOOT
+CURRENT id=0x01 baud=1
+TARGET  id=0x02 baud=1
+PROBE OK id=0x01
+TX SET_ID 0x01 → 0x02
+RX ACK cmd=0x02 code=0
+PROBE OK id=0x02
+ID change skipped (same)
+CONFIG OK</span></pre>
+      </div>
+      <div class="box">
+        <h4 class="red">Алдаа — улаан LED (LD3)</h4>
+        <pre><span class="red">CONFIG TOOL BOOT
+CURRENT id=0x01 baud=1
+TARGET  id=0x02 baud=1
+TX READ id=0x01
+TX READ id=0x01
+...
+CURRENT ID 0x01 not found
+CONFIG FAILED</span></pre>
+      </div>
+    </div>
+
+    <div class="warn">CONFIG FAILED гарвал: утас холболт шалга, CURRENT_ID зөв эсэхийг нягтал, бaud тохирч байгаа эсэхийг шалга.</div>
+
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────── STEP 7 ──── -->
+<div class="step">
+  <div class="step-header">
+    <div class="num">7</div>
+    <div class="step-title">LED Үр дүн</div>
+  </div>
+  <div class="step-body">
+
+    <div class="diag">
+  Nucleo-F746ZG LED байршил:
+  ┌─────────────────────────────────────────────┐
+  │                                             │
+  │   [LD1 ●] ─── PB0  ─── <span class="green">НОГООН = Амжилттай</span> │
+  │   [LD2 ●] ─── PB7  ─── Ашиглагдаагүй       │
+  │   [LD3 ●] ─── PB14 ─── <span class="red">УЛААН = Алдаа</span>      │
+  │                                             │
+  └─────────────────────────────────────────────┘
+    </div>
+
+    <div class="ok">Ногоон LED асвал: Encoder-ийн CAN ID / Baud амжилттай солигдсон. Хавтанг салга.</div>
+
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────── STEP 8 ──── -->
+<div class="step">
+  <div class="step-header">
+    <div class="num">8</div>
+    <div class="step-title">Дараагийн encoder тохируулах</div>
+  </div>
+  <div class="step-body">
+
+    <pre><span style="color:#8b949e">/* main.c → шинэ утгаар өөрчил */</span>
+
+<span style="color:#ff7b72">#define</span> ENCODER_CURRENT_ID    0x<span class="yellow">01</span>U   <span style="color:#8b949e">← шинэ encoder-ийн factory ID</span>
+<span style="color:#ff7b72">#define</span> ENCODER_TARGET_ID     0x<span class="yellow">03</span>U   <span style="color:#8b949e">← хүссэн ID</span></pre>
+
+    <ol>
+      <li>Өмнөх encoder-ийг салга → шинэ encoder холб</li>
+      <li>main.c-ийн утгуудыг өөрчил</li>
+      <li><b>Ctrl+B</b> → <b>F11</b> (build + flash)</li>
+      <li>Reset → Ногоон LED хүлээ</li>
+    </ol>
+
+    <div class="note">Нэг удаа flash хийсэн хавтан дахин дахин ашиглагдана — зөвхөн <code>#define</code> утгыг өөрчилж дахин flash хий.</div>
+
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────── SUMMARY ──── -->
+<div class="step" style="border-color:#1f6feb">
+  <div class="step-header" style="background:#1a2d4a">
+    <div class="num" style="background:#388bfd">✓</div>
+    <div class="step-title" style="color:#79c0ff">Товч дүгнэлт</div>
+  </div>
+  <div class="step-body">
+    <div class="diag">
+  БЭЛДЭЛ:  Nucleo + SN65HVD230 + Encoder холб
+     │
+     ▼
+  ТОХИРГОО: main.c дахь CURRENT_ID / TARGET_ID / BAUD өөрчил
+     │
+     ▼
+  BUILD + FLASH: Ctrl+B → F11
+     │
+     ▼
+  ХЯНАХ:  Serial 115200 / LED
+     │
+     ├── <span class="green">Ногоон LED → Амжилт ✓</span>
+     └── <span class="red">Улаан LED  → Алдаа → Холболт / ID шалга</span>
+    </div>
+  </div>
+</div>
+
+<div style="text-align:center; padding:24px; color:#444d56; font-size:12px">
+  Wire_encoder_ID · STM32 Nucleo-F746ZG · Briter CAN Encoder Config Tool
+</div>
+
+</body>
+</html>

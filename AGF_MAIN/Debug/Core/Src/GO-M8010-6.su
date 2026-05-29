@@ -1,0 +1,6 @@
+../Core/Inc/crc_ccitt.h:49:17:crc_ccitt_byte	16	static
+../Core/Inc/crc_ccitt.h:61:17:crc_ccitt	32	static
+../Core/Src/GO-M8010-6.c:15:10:crc32_core	40	static
+../Core/Src/GO-M8010-6.c:43:5:modify_data	16	static
+../Core/Src/GO-M8010-6.c:66:5:extract_data	24	static
+../Core/Src/GO-M8010-6.c:89:19:SERVO_Send_recv	32	static

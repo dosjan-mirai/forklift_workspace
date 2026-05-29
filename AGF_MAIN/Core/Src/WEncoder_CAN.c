@@ -1,0 +1,365 @@
+/*
+ * WEncoder_CAN.c
+ *
+ * Briter wire encoder — бүрэн нэгтгэсэн lib.
+ * Core protocol (briter_encoder_lib) + FreeRTOS driver (WEncoder_CAN)
+ * нэг файлд багтаасан.
+ */
+
+#include "WEncoder_CAN.h"
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  PROTOCOL CONSTANTS
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Poll request: [0x04][id][0x01][0x00] DLC=4 */
+#define WENC_CMD_BYTE       0x04U
+#define WENC_CMD_READ       0x01U
+#define WENC_POLL_DLC       4U
+#define WENC_RESP_MIN_DLC   4U
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  GLOBAL HANDLE
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+WEnc_Handle_t g_wenc = {0};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  CORE PROTOCOL (өмнөх briter_encoder_lib)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+static void core_Init(WEnc_Core_t *c, uint8_t id,
+                      int32_t total, float res, int32_t max_step)
+{
+    c->encoder_id      = id;
+    c->total_counts    = total;
+    c->resolution_mm   = res;
+    c->max_step_counts = max_step;
+    c->baseline        = 0;
+    c->baseline_set    = 0U;
+}
+
+/* Poll request frame үүсгэх */
+static void core_BuildRequest(uint8_t id, uint8_t *data)
+{
+    data[0] = WENC_CMD_BYTE;
+    data[1] = id;
+    data[2] = WENC_CMD_READ;
+    data[3] = 0x00U;
+    data[4] = 0x00U;
+    data[5] = 0x00U;
+    data[6] = 0x00U;
+    data[7] = 0x00U;
+}
+
+/* Echo шүүх: [0x04][id][0x01][0x00] DLC=4 */
+static uint8_t core_IsEcho(const uint8_t *data, uint8_t dlc)
+{
+    if (dlc != WENC_POLL_DLC)    return 0U;
+    if (data[0] != WENC_CMD_BYTE) return 0U;
+    if (data[2] != WENC_CMD_READ) return 0U;
+    if (data[3] != 0x00U)         return 0U;
+    return 1U;
+}
+
+/* Valid response шалгах */
+static uint8_t core_IsValidResponse(uint16_t std_id, uint8_t dlc,
+                                     uint8_t enc_id)
+{
+    if (std_id != (uint16_t)enc_id)  return 0U;
+    if (dlc < WENC_RESP_MIN_DLC)     return 0U;
+    return 1U;
+}
+
+/* LE int32 decode */
+static int32_t core_DecodeLE(const uint8_t *data)
+{
+    uint32_t u = ((uint32_t)data[0])        |
+                 ((uint32_t)data[1] <<  8U) |
+                 ((uint32_t)data[2] << 16U) |
+                 ((uint32_t)data[3] << 24U);
+    return (int32_t)u;
+}
+
+/* Step filter — хэт том алхам drop */
+static uint8_t core_AcceptStep(WEnc_Core_t *c, int32_t new_raw)
+{
+    if (!c->baseline_set) return 1U;
+    int32_t delta = new_raw - c->baseline;
+    if (delta < 0) delta = -delta;
+    return (delta <= c->max_step_counts) ? 1U : 0U;
+}
+
+/* Auto baseline — эхний утгаар тэглэх */
+static uint8_t core_AutoBaseline(WEnc_Core_t *c, int32_t raw)
+{
+    if (c->baseline_set) return 0U;
+    c->baseline     = raw;
+    c->baseline_set = 1U;
+    return 1U;
+}
+
+/* Displacement тооцоо */
+static float core_DisplacementMm(const WEnc_Core_t *c, int32_t raw)
+{
+    return (float)(raw - c->baseline) * c->resolution_mm;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  PRIVATE DRIVER HELPERS
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+static HAL_StatusTypeDef prv_ApplyBitTiming(uint8_t baud_code)
+{
+    CAN_HandleTypeDef *h = g_wenc.hcan;
+    h->Init.SyncJumpWidth = CAN_SJW_1TQ;
+    h->Init.TimeSeg1      = CAN_BS1_13TQ;
+    h->Init.TimeSeg2      = CAN_BS2_2TQ;
+    switch (baud_code) {
+        case WENC_BAUD_500K: h->Init.Prescaler = 6;  break;
+        case WENC_BAUD_1M:   h->Init.Prescaler = 3;  break;
+        case WENC_BAUD_250K: h->Init.Prescaler = 12; break;
+        case WENC_BAUD_125K: h->Init.Prescaler = 24; break;
+        case WENC_BAUD_100K: h->Init.Prescaler = 30; break;
+        default: return HAL_ERROR;
+    }
+    return HAL_OK;
+}
+
+static WEnc_Encoder_t *prv_Find(uint8_t can_id)
+{
+    for (uint8_t i = 0U; i < g_wenc.count; i++) {
+        if (g_wenc.pool[i].in_use && g_wenc.pool[i].can_id == can_id)
+            return &g_wenc.pool[i];
+    }
+    return NULL;
+}
+
+static void prv_SendRequest(uint8_t can_id)
+{
+    CAN_TxHeaderTypeDef hdr;
+    uint8_t  data[8];
+    uint32_t mailbox;
+
+    hdr.StdId              = can_id;
+    hdr.IDE                = CAN_ID_STD;
+    hdr.RTR                = CAN_RTR_DATA;
+    hdr.DLC                = WENC_POLL_DLC;
+    hdr.TransmitGlobalTime = DISABLE;
+
+    core_BuildRequest(can_id, data);
+
+    if (HAL_CAN_GetTxMailboxesFreeLevel(g_wenc.hcan) == 0U) return;
+    (void)HAL_CAN_AddTxMessage(g_wenc.hcan, &hdr, data, &mailbox);
+}
+
+static void prv_ProcessFrame(WEnc_Frame_t *f)
+{
+    WEnc_Encoder_t *e = prv_Find((uint8_t)f->std_id);
+    if (e == NULL) return;
+
+    if (core_IsEcho(f->data, f->dlc)) return;
+    if (!core_IsValidResponse(f->std_id, f->dlc, e->can_id)) return;
+
+    int32_t raw = core_DecodeLE(f->data);
+    if (!core_AcceptStep(&e->core, raw)) return;
+
+    core_AutoBaseline(&e->core, raw);
+
+    if (xSemaphoreTake(g_wenc.data_mutex, pdMS_TO_TICKS(2U)) == pdTRUE) {
+        e->raw        = raw;
+        e->disp_mm    = core_DisplacementMm(&e->core, raw);
+        e->last_rx_ms = HAL_GetTick();
+        e->valid      = 1U;
+        xSemaphoreGive(g_wenc.data_mutex);
+    }
+
+    if (g_wenc.out_queue != NULL) {
+        WEnc_Reading_t r;
+        r.can_id  = e->can_id;
+        r.disp_mm = e->disp_mm;
+        r.raw     = e->raw;
+        r.valid   = 1U;
+        r.tick    = HAL_GetTick();
+        memcpy(r.label, e->label, sizeof(r.label));
+        xQueueOverwrite(g_wenc.out_queue, &r);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ *  PUBLIC API
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+void WEncoder_CAN_Init(CAN_HandleTypeDef *hcan,
+                       SemaphoreHandle_t  can_mutex,
+                       QueueHandle_t      out_queue)
+{
+    memset(&g_wenc, 0, sizeof(g_wenc));
+    g_wenc.hcan        = hcan;
+    g_wenc.can_mutex   = can_mutex;
+    g_wenc.out_queue   = out_queue;
+    g_wenc.rx_queue    = xQueueCreate(WENC_RX_QUEUE_DEPTH, sizeof(WEnc_Frame_t));
+    g_wenc.data_mutex  = xSemaphoreCreateMutex();
+    g_wenc.initialized = 1U;
+}
+
+uint8_t WEncoder_CAN_AddEncoder(uint8_t     can_id,
+                                 const char *label,
+                                 int32_t     total_counts,
+                                 float       resolution_mm,
+                                 int32_t     max_step)
+{
+    if (!g_wenc.initialized)                return 0xFFU;
+    if (g_wenc.count >= WENC_MAX_ENCODERS)  return 0xFFU;
+    if (prv_Find(can_id) != NULL)           return 0xFFU;
+
+    uint8_t         idx = g_wenc.count;
+    WEnc_Encoder_t *e   = &g_wenc.pool[idx];
+
+    e->can_id = can_id;
+    strncpy(e->label, label, sizeof(e->label) - 1U);
+    e->label[sizeof(e->label) - 1U] = '\0';
+    e->valid  = 0U;
+    e->in_use = 1U;
+
+    core_Init(&e->core, can_id, total_counts, resolution_mm, max_step);
+
+    g_wenc.count++;
+    return idx;
+}
+
+HAL_StatusTypeDef WEncoder_CAN_StartStack(CAN_HandleTypeDef *hcan)
+{
+    g_wenc.hcan = hcan;
+    if (prv_ApplyBitTiming(WENC_RUN_BAUD) != HAL_OK) return HAL_ERROR;
+
+    CAN_FilterTypeDef f = {0};
+    f.FilterBank           = 0;
+    f.FilterMode           = CAN_FILTERMODE_IDMASK;
+    f.FilterScale          = CAN_FILTERSCALE_32BIT;
+    f.FilterIdHigh         = 0x0000;
+    f.FilterIdLow          = 0x0000;
+    f.FilterMaskIdHigh     = 0x0000;
+    f.FilterMaskIdLow      = 0x0000;
+    f.FilterFIFOAssignment = CAN_RX_FIFO0;
+    f.FilterActivation     = ENABLE;
+    f.SlaveStartFilterBank = 14;
+
+    if (HAL_CAN_ConfigFilter(hcan, &f) != HAL_OK)  return HAL_ERROR;
+    if (HAL_CAN_ActivateNotification(hcan,
+            CAN_IT_RX_FIFO0_MSG_PENDING |
+            CAN_IT_TX_MAILBOX_EMPTY     |
+            CAN_IT_BUSOFF               |
+            CAN_IT_ERROR                |
+            CAN_IT_LAST_ERROR_CODE) != HAL_OK)      return HAL_ERROR;
+    if (HAL_CAN_Start(hcan) != HAL_OK)              return HAL_ERROR;
+    return HAL_OK;
+}
+
+void WEncoder_CAN_Task(void *pvParameters)
+{
+    (void)pvParameters;
+    WEnc_Frame_t frame;
+    TickType_t   last_req[WENC_MAX_ENCODERS] = {0};
+
+    for (;;) {
+        TickType_t now = xTaskGetTickCount();
+
+        for (uint8_t i = 0U; i < g_wenc.count; i++) {
+            if (!g_wenc.pool[i].in_use) continue;
+
+            if ((now - last_req[i]) >= pdMS_TO_TICKS(WENC_REQUEST_INTERVAL_MS)) {
+                if (xSemaphoreTake(g_wenc.can_mutex,
+                                   pdMS_TO_TICKS(2U)) == pdTRUE) {
+                    prv_SendRequest(g_wenc.pool[i].can_id);
+                    xSemaphoreGive(g_wenc.can_mutex);
+                }
+                last_req[i] = now;
+            }
+        }
+
+        while (xQueueReceive(g_wenc.rx_queue, &frame,
+                             pdMS_TO_TICKS(1U)) == pdTRUE) {
+            prv_ProcessFrame(&frame);
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(1U));
+    }
+}
+
+uint8_t WEncoder_CAN_RxCallback(CAN_HandleTypeDef *hcan)
+{
+    CAN_RxHeaderTypeDef hdr;
+    uint8_t             data[8];
+
+    if (hcan->Instance != g_wenc.hcan->Instance) return 0U;
+    if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &hdr, data) != HAL_OK) return 0U;
+
+    if (hdr.IDE != CAN_ID_STD)                      return 0U;
+    if (prv_Find((uint8_t)hdr.StdId) == NULL)       return 0U;
+
+    WEnc_Frame_t f;
+    f.std_id = (uint16_t)hdr.StdId;
+    f.dlc    = hdr.DLC;
+    memcpy(f.data, data, 8U);
+
+    BaseType_t xHigher = pdFALSE;
+    xQueueSendFromISR(g_wenc.rx_queue, &f, &xHigher);
+    portYIELD_FROM_ISR(xHigher);
+    return 1U;
+}
+
+uint8_t WEncoder_CAN_GetByIndex(uint8_t index, WEnc_Reading_t *out)
+{
+    if (index >= g_wenc.count)       return 0U;
+    if (!g_wenc.pool[index].in_use)  return 0U;
+
+    if (xSemaphoreTake(g_wenc.data_mutex, pdMS_TO_TICKS(2U)) == pdTRUE) {
+        WEnc_Encoder_t *e = &g_wenc.pool[index];
+        out->can_id  = e->can_id;
+        out->disp_mm = e->disp_mm;
+        out->raw     = e->raw;
+        out->valid   = e->valid;
+        out->tick    = e->last_rx_ms;
+        memcpy(out->label, e->label, sizeof(out->label));
+        xSemaphoreGive(g_wenc.data_mutex);
+        return 1U;
+    }
+    return 0U;
+}
+
+uint8_t WEncoder_CAN_GetById(uint8_t can_id, WEnc_Reading_t *out)
+{
+    for (uint8_t i = 0U; i < g_wenc.count; i++) {
+        if (g_wenc.pool[i].can_id == can_id && g_wenc.pool[i].in_use)
+            return WEncoder_CAN_GetByIndex(i, out);
+    }
+    return 0U;
+}
+
+uint8_t WEncoder_CAN_GetCount(void)
+{
+    return g_wenc.count;
+}
+
+uint8_t WEncoder_CAN_IsTimeout(uint8_t index)
+{
+    if (index >= g_wenc.count)     return 1U;
+    if (!g_wenc.pool[index].valid) return 0U;
+    return ((HAL_GetTick() - g_wenc.pool[index].last_rx_ms)
+            > WENC_ENCODER_TIMEOUT_MS) ? 1U : 0U;
+}
+
+void WEncoder_CAN_ZeroHere(uint8_t index)
+{
+    if (index >= g_wenc.count)      return;
+    if (!g_wenc.pool[index].in_use) return;
+
+    if (xSemaphoreTake(g_wenc.data_mutex, pdMS_TO_TICKS(5U)) == pdTRUE) {
+        WEnc_Encoder_t *e   = &g_wenc.pool[index];
+        e->core.baseline     = e->raw;
+        e->core.baseline_set = 1U;
+        e->disp_mm           = 0.0f;
+        xSemaphoreGive(g_wenc.data_mutex);
+    }
+}

@@ -1,0 +1,10 @@
+18:41:55 **** Incremental Build of configuration Debug for project Wire_encoder ****
+make -j16 all 
+arm-none-eabi-size  Wire_encoder.elf 
+   text	   data	    bss	    dec	    hex	filename
+  33716	    468	   2716	  36900	   9024	Wire_encoder.elf
+Finished building: default.size.stdout
+ 
+
+18:41:55 Build Finished. 0 errors, 0 warnings. (took 167ms)
+

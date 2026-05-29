@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Rename resource &apos;Motor_control_with_can2/Motor_control.ioc&apos; to &apos;Motor_control_with_can2.ioc&apos;" description="Rename resource &apos;Motor_control.ioc&apos;" flags="7" id="org.eclipse.ltk.core.refactoring.rename.resource" input="Motor_control.ioc" name="Motor_control_with_can2.ioc" stamp="1779875263029" updateReferences="true"/>
+</session>

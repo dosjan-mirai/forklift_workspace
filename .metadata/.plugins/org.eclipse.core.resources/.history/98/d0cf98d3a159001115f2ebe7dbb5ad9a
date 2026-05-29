@@ -1,0 +1,114 @@
+ifndef BRITER_ENCODER_LIB_H
+#define BRITER_ENCODER_LIB_H
+
+#include <stdint.h>
+
+typedef struct {
+	uint8_t encoder_id;
+	int32_t total_counts;
+	float resolution_mm;
+	int32_t max_step_counts;
+	int32_t baseline;
+	uint8_t baseline_set;
+	int32_t prev_raw;
+	uint8_t prev_valid;
+} BriterEncoderLib;
+
+static inline void BriterEncoderLib_Init(BriterEncoderLib *ctx,
+		uint8_t encoder_id,
+		int32_t total_counts,
+		float resolution_mm,
+		int32_t max_step_counts)
+{
+	ctx->encoder_id = encoder_id;
+	ctx->total_counts = total_counts;
+	ctx->resolution_mm = resolution_mm;
+	ctx->max_step_counts = max_step_counts;
+	ctx->baseline = 0;
+	ctx->baseline_set = 0U;
+	ctx->prev_raw = 0;
+	ctx->prev_valid = 0U;
+}
+
+static inline void BriterEncoderLib_BuildReadRequest(uint8_t encoder_id, uint8_t out_data[8])
+{
+	out_data[0] = 0x04U;
+	out_data[1] = encoder_id;
+	out_data[2] = 0x01U;
+	out_data[3] = 0x00U;
+	out_data[4] = 0x00U;
+	out_data[5] = 0x00U;
+	out_data[6] = 0x00U;
+	out_data[7] = 0x00U;
+}
+
+static inline uint8_t BriterEncoderLib_IsReadEcho(const uint8_t *d, uint8_t dlc)
+{
+	return (uint8_t)((dlc == 4U) && (d[0] == 0x04U) && (d[2] == 0x01U) && (d[3] == 0x00U));
+}
+
+static inline uint8_t BriterEncoderLib_IsReadResponseFrame(uint16_t std_id,
+		uint8_t dlc,
+		const uint8_t *d,
+		uint8_t expected_id)
+{
+	return (uint8_t)((std_id == expected_id) &&
+			(dlc >= 7U) &&
+			(d[0] == 0x07U) &&
+			(d[1] == expected_id) &&
+			(d[2] == 0x01U));
+}
+
+static inline int32_t BriterEncoderLib_DecodeRawLE(const uint8_t *d)
+{
+	uint32_t raw = (uint32_t)d[3]
+			| ((uint32_t)d[4] << 8)
+			| ((uint32_t)d[5] << 16)
+			| ((uint32_t)d[6] << 24);
+	return (int32_t)raw;
+}
+
+static inline int32_t BriterEncoderLib_WrapDelta(const BriterEncoderLib *ctx, int32_t delta)
+{
+	if (delta > (ctx->total_counts / 2)) {
+		delta -= ctx->total_counts;
+	} else if (delta < -(ctx->total_counts / 2)) {
+		delta += ctx->total_counts;
+	}
+	return delta;
+}
+
+static inline uint8_t BriterEncoderLib_AcceptStep(BriterEncoderLib *ctx, int32_t raw_value)
+{
+	if (ctx->prev_valid == 0U) {
+		ctx->prev_raw = raw_value;
+		ctx->prev_valid = 1U;
+		return 1U;
+	}
+
+	int32_t step = BriterEncoderLib_WrapDelta(ctx, raw_value - ctx->prev_raw);
+	if ((step > ctx->max_step_counts) || (step < -ctx->max_step_counts)) {
+		return 0U;
+	}
+
+	ctx->prev_raw = raw_value;
+	return 1U;
+}
+
+static inline uint8_t BriterEncoderLib_AutoBaseline(BriterEncoderLib *ctx, int32_t raw_value)
+{
+	if (ctx->baseline_set == 0U) {
+		ctx->baseline = raw_value;
+		ctx->baseline_set = 1U;
+		return 1U;
+	}
+	return 0U;
+}
+
+static inline float BriterEncoderLib_DisplacementMm(const BriterEncoderLib *ctx, int32_t raw_value)
+{
+	int32_t delta = BriterEncoderLib_WrapDelta(ctx, raw_value - ctx->baseline);
+	return ((float)delta * ctx->resolution_mm);
+}
+
+#endif

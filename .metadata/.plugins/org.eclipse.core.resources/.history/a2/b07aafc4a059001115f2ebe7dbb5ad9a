@@ -1,0 +1,195 @@
+///*
+// * WEncoder_CAN.h
+// *
+// * Briter wire encoder — бүрэн нэгтгэсэн lib.
+// * briter_encoder_lib + WEncoder_CAN хоёуланг нэг файлд багтаасан.
+// * Гаднаас нэмэлт header include хийх шаардлагагүй.
+// *
+// * Ашиглах:
+// *   1. WEncoder_CAN_Init()       — main.c USER CODE BEGIN 2
+// *   2. WEncoder_CAN_AddEncoder() — encoder бүртгэх (хэдэн ч болно)
+// *   3. WEncoder_CAN_StartStack() — CAN filter + start
+// *   4. xTaskCreate(WEncoder_CAN_Task, ...) — FreeRTOS task
+// *   5. WEncoder_CAN_RxCallback() — HAL_CAN_RxFifo0MsgPendingCallback дотор
+// */
+//
+//#ifndef INC_WENCODER_CAN_H_
+//#define INC_WENCODER_CAN_H_
+//
+//#include "main.h"
+//#include "FreeRTOS.h"
+//#include "task.h"
+//#include "queue.h"
+//#include "semphr.h"
+//#include <stdint.h>
+//#include <string.h>
+//
+//#ifdef __cplusplus
+//extern "C" {
+//#endif
+//
+///* ═══════════════════════════════════════════════════════════════════════════
+// *  ТОХИРГОО — хэрэгцээгээрээ өөрчил
+// * ═══════════════════════════════════════════════════════════════════════════ */
+//
+//#define WENC_MAX_ENCODERS           8U      /* Pool хэмжээ */
+//#define WENC_REQUEST_INTERVAL_MS    5U      /* Poll давтамж (ms) */
+//#define WENC_RESPONSE_TIMEOUT_MS    40U     /* RX timeout (ms) */
+//#define WENC_ENCODER_TIMEOUT_MS     50U     /* Monitor timeout (ms) */
+//#define WENC_RX_QUEUE_DEPTH         16U     /* ISR → task queue */
+//
+///* Baud code */
+//#define WENC_BAUD_500K  0x00U
+//#define WENC_BAUD_1M    0x01U
+//#define WENC_BAUD_250K  0x02U
+//#define WENC_BAUD_125K  0x03U
+//#define WENC_BAUD_100K  0x04U
+//#define WENC_RUN_BAUD   WENC_BAUD_1M
+//
+///* ═══════════════════════════════════════════════════════════════════════════
+// *  ДОТООД STRUCT (briter_encoder_lib-ийн агуулга)
+// * ═══════════════════════════════════════════════════════════════════════════ */
+//
+///* Encoder core state — өмнөх BriterEncoderLib */
+//typedef struct {
+//    uint8_t  encoder_id;
+//    int32_t  total_counts;
+//    float    resolution_mm;
+//    int32_t  max_step_counts;
+//    int32_t  baseline;
+//    uint8_t  baseline_set;
+//} WEnc_Core_t;
+//
+///* ═══════════════════════════════════════════════════════════════════════════
+// *  PUBLIC STRUCT
+// * ═══════════════════════════════════════════════════════════════════════════ */
+//
+///* Encoder instance */
+//typedef struct {
+//    uint8_t     can_id;
+//    char        label[16];
+//    WEnc_Core_t core;
+//    float       disp_mm;
+//    int32_t     raw;
+//    uint32_t    last_rx_ms;
+//    uint8_t     valid;
+//    uint8_t     in_use;
+//} WEnc_Encoder_t;
+//
+///* ISR → task frame */
+//typedef struct {
+//    uint16_t std_id;
+//    uint8_t  dlc;
+//    uint8_t  data[8];
+//} WEnc_Frame_t;
+//
+///* Output — GetByIndex / GetById / queue-аас авах */
+//typedef struct {
+//    uint8_t  can_id;
+//    char     label[16];
+//    float    disp_mm;
+//    int32_t  raw;
+//    uint8_t  valid;
+//    uint32_t tick;
+//} WEnc_Reading_t;
+//
+///* Library handle */
+//typedef struct {
+//    WEnc_Encoder_t    pool[WENC_MAX_ENCODERS];
+//    uint8_t           count;
+//    SemaphoreHandle_t can_mutex;
+//    SemaphoreHandle_t data_mutex;
+//    QueueHandle_t     rx_queue;
+//    QueueHandle_t     out_queue;
+//    CAN_HandleTypeDef *hcan;
+//    uint8_t           initialized;
+//} WEnc_Handle_t;
+//
+//extern WEnc_Handle_t g_wenc;
+//
+///* ═══════════════════════════════════════════════════════════════════════════
+// *  API
+// * ═══════════════════════════════════════════════════════════════════════════ */
+//
+///**
+// * @brief  Library init — main.c USER CODE BEGIN 2 дотор хамгийн эхэнд.
+// * @param  hcan       CAN peripheral (hcan1)
+// * @param  can_mutex  Robstride-тэй хуваалцах TX mutex
+// * @param  out_queue  vMotionControlTask-д өгөх queue (NULL болж болно)
+// */
+//void WEncoder_CAN_Init(CAN_HandleTypeDef *hcan,
+//                       SemaphoreHandle_t  can_mutex,
+//                       QueueHandle_t      out_queue);
+//
+///**
+// * @brief  Encoder бүртгэх. Init дараа, Task эхлэхийн өмнө.
+// *
+// * @param  can_id        CAN STD ID (0x01, 0x02 ...)
+// * @param  label         Нэр: "Lift", "Tilt", "Shift" ...
+// * @param  total_counts  Нийт count (98300)
+// * @param  resolution_mm Нэг count = мм (0.0244f)
+// * @param  max_step      Нэг poll хоорондын хамгийн их алхам (5000)
+// * @return Index (0..N-1), 0xFF = pool дүүрсэн / давхардсан ID
+// *
+// * Жишээ:
+// *   WEncoder_CAN_AddEncoder(0x01, "Lift",  98300, 0.0244f, 5000);
+// *   WEncoder_CAN_AddEncoder(0x02, "Tilt",  98300, 0.0244f, 5000);
+// *   WEncoder_CAN_AddEncoder(0x03, "Shift", 50000, 0.01f,   3000);
+// */
+//uint8_t WEncoder_CAN_AddEncoder(uint8_t     can_id,
+//                                 const char *label,
+//                                 int32_t     total_counts,
+//                                 float       resolution_mm,
+//                                 int32_t     max_step);
+//
+///**
+// * @brief  CAN filter + start. MX_CAN1_Init()-ийн ард дуудна.
+// */
+//HAL_StatusTypeDef WEncoder_CAN_StartStack(CAN_HandleTypeDef *hcan);
+//
+///**
+// * @brief  FreeRTOS task. xTaskCreate-д өгнө.
+// *         Бүртгэгдсэн бүх encoder-ийг poll + RX боловсруулна.
+// */
+//void WEncoder_CAN_Task(void *pvParameters);
+//
+///**
+// * @brief  HAL_CAN_RxFifo0MsgPendingCallback дотор дуудна.
+// * @return 1 = STD frame (Briter, боловсруулсан)
+// *         0 = EXT frame (Robstride) — гаднаас авна
+// */
+//uint8_t WEncoder_CAN_RxCallback(CAN_HandleTypeDef *hcan);
+//
+///**
+// * @brief  Index-ээр encoder утга авах (mutex-protected).
+// * @return 1 = OK, 0 = invalid
+// */
+//uint8_t WEncoder_CAN_GetByIndex(uint8_t index, WEnc_Reading_t *out);
+//
+///**
+// * @brief  CAN ID-аар encoder утга авах.
+// * @return 1 = олдсон, 0 = олдоогүй
+// */
+//uint8_t WEncoder_CAN_GetById(uint8_t can_id, WEnc_Reading_t *out);
+//
+///**
+// * @brief  Бүртгэгдсэн encoder тоо.
+// */
+//uint8_t WEncoder_CAN_GetCount(void);
+//
+///**
+// * @brief  Timeout шалгах — vSystemMonitorTask-аас.
+// * @return 1 = timeout, 0 = OK
+// */
+//uint8_t WEncoder_CAN_IsTimeout(uint8_t index);
+//
+///**
+// * @brief  Тэглэх — одоогийн байрлалыг 0 болгох.
+// */
+//void WEncoder_CAN_ZeroHere(uint8_t index);
+//
+//#ifdef __cplusplus
+//}
+//#endif
+//
+//#endif /* INC_WENCODER_CAN_H_ */

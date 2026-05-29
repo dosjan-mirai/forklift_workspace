@@ -1,0 +1,10 @@
+18:41:55 **** Incremental Build of configuration Debug for project Unitree-M8010-6 ****
+make -j16 all 
+arm-none-eabi-size  Unitree-M8010-6.elf 
+   text	   data	    bss	    dec	    hex	filename
+  26680	     12	   3304	  29996	   752c	Unitree-M8010-6.elf
+Finished building: default.size.stdout
+ 
+
+18:41:55 Build Finished. 0 errors, 0 warnings. (took 168ms)
+

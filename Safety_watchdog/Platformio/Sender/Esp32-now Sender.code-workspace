@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "Esp32-now Sender",
+			"path": "../Esp32-now Sender"
+		},
+		{
+			"name": "Now_Sender",
+			"path": "."
+		}
+	],
+	"settings": {}
+}

@@ -1,0 +1,10 @@
+18:41:55 **** Incremental Build of configuration Debug for project R1_MAIN_2026 ****
+make -j16 all 
+arm-none-eabi-size  R1_MAIN_2026.elf 
+   text	   data	    bss	    dec	    hex	filename
+  49308	    440	  25400	  75148	  1258c	R1_MAIN_2026.elf
+Finished building: default.size.stdout
+ 
+
+18:41:55 Build Finished. 0 errors, 0 warnings. (took 221ms)
+
