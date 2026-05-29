@@ -7,6 +7,7 @@
 C_SRCS += \
 ../Core/Src/GO-M8010-6.c \
 ../Core/Src/WEncoder_CAN.c \
+../Core/Src/amt203.c \
 ../Core/Src/main.c \
 ../Core/Src/robstride.c \
 ../Core/Src/stm32f7xx_hal_msp.c \
@@ -19,6 +20,7 @@ C_SRCS += \
 OBJS += \
 ./Core/Src/GO-M8010-6.o \
 ./Core/Src/WEncoder_CAN.o \
+./Core/Src/amt203.o \
 ./Core/Src/main.o \
 ./Core/Src/robstride.o \
 ./Core/Src/stm32f7xx_hal_msp.o \
@@ -31,6 +33,7 @@ OBJS += \
 C_DEPS += \
 ./Core/Src/GO-M8010-6.d \
 ./Core/Src/WEncoder_CAN.d \
+./Core/Src/amt203.d \
 ./Core/Src/main.d \
 ./Core/Src/robstride.d \
 ./Core/Src/stm32f7xx_hal_msp.d \
@@ -48,7 +51,7 @@ Core/Src/%.o Core/Src/%.su Core/Src/%.cyclo: ../Core/Src/%.c Core/Src/subdir.mk
 clean: clean-Core-2f-Src
 
 clean-Core-2f-Src:
-	-$(RM) ./Core/Src/GO-M8010-6.cyclo ./Core/Src/GO-M8010-6.d ./Core/Src/GO-M8010-6.o ./Core/Src/GO-M8010-6.su ./Core/Src/WEncoder_CAN.cyclo ./Core/Src/WEncoder_CAN.d ./Core/Src/WEncoder_CAN.o ./Core/Src/WEncoder_CAN.su ./Core/Src/main.cyclo ./Core/Src/main.d ./Core/Src/main.o ./Core/Src/main.su ./Core/Src/robstride.cyclo ./Core/Src/robstride.d ./Core/Src/robstride.o ./Core/Src/robstride.su ./Core/Src/stm32f7xx_hal_msp.cyclo ./Core/Src/stm32f7xx_hal_msp.d ./Core/Src/stm32f7xx_hal_msp.o ./Core/Src/stm32f7xx_hal_msp.su ./Core/Src/stm32f7xx_hal_timebase_tim.cyclo ./Core/Src/stm32f7xx_hal_timebase_tim.d ./Core/Src/stm32f7xx_hal_timebase_tim.o ./Core/Src/stm32f7xx_hal_timebase_tim.su ./Core/Src/stm32f7xx_it.cyclo ./Core/Src/stm32f7xx_it.d ./Core/Src/stm32f7xx_it.o ./Core/Src/stm32f7xx_it.su ./Core/Src/syscalls.cyclo ./Core/Src/syscalls.d ./Core/Src/syscalls.o ./Core/Src/syscalls.su ./Core/Src/sysmem.cyclo ./Core/Src/sysmem.d ./Core/Src/sysmem.o ./Core/Src/sysmem.su ./Core/Src/system_stm32f7xx.cyclo ./Core/Src/system_stm32f7xx.d ./Core/Src/system_stm32f7xx.o ./Core/Src/system_stm32f7xx.su
+	-$(RM) ./Core/Src/GO-M8010-6.cyclo ./Core/Src/GO-M8010-6.d ./Core/Src/GO-M8010-6.o ./Core/Src/GO-M8010-6.su ./Core/Src/WEncoder_CAN.cyclo ./Core/Src/WEncoder_CAN.d ./Core/Src/WEncoder_CAN.o ./Core/Src/WEncoder_CAN.su ./Core/Src/amt203.cyclo ./Core/Src/amt203.d ./Core/Src/amt203.o ./Core/Src/amt203.su ./Core/Src/main.cyclo ./Core/Src/main.d ./Core/Src/main.o ./Core/Src/main.su ./Core/Src/robstride.cyclo ./Core/Src/robstride.d ./Core/Src/robstride.o ./Core/Src/robstride.su ./Core/Src/stm32f7xx_hal_msp.cyclo ./Core/Src/stm32f7xx_hal_msp.d ./Core/Src/stm32f7xx_hal_msp.o ./Core/Src/stm32f7xx_hal_msp.su ./Core/Src/stm32f7xx_hal_timebase_tim.cyclo ./Core/Src/stm32f7xx_hal_timebase_tim.d ./Core/Src/stm32f7xx_hal_timebase_tim.o ./Core/Src/stm32f7xx_hal_timebase_tim.su ./Core/Src/stm32f7xx_it.cyclo ./Core/Src/stm32f7xx_it.d ./Core/Src/stm32f7xx_it.o ./Core/Src/stm32f7xx_it.su ./Core/Src/syscalls.cyclo ./Core/Src/syscalls.d ./Core/Src/syscalls.o ./Core/Src/syscalls.su ./Core/Src/sysmem.cyclo ./Core/Src/sysmem.d ./Core/Src/sysmem.o ./Core/Src/sysmem.su ./Core/Src/system_stm32f7xx.cyclo ./Core/Src/system_stm32f7xx.d ./Core/Src/system_stm32f7xx.o ./Core/Src/system_stm32f7xx.su
 
 .PHONY: clean-Core-2f-Src
 

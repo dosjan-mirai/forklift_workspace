@@ -1,5 +1,6 @@
 "./Core/Src/GO-M8010-6.o"
 "./Core/Src/WEncoder_CAN.o"
+"./Core/Src/amt203.o"
 "./Core/Src/main.o"
 "./Core/Src/robstride.o"
 "./Core/Src/stm32f7xx_hal_msp.o"
